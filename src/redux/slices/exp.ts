@@ -1,89 +1,95 @@
-import { ExpsState, Item } from "@/types";
+import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { supabase } from "@/lib/supabase";
+import { getCurrentDate } from "@/hooks/useCurrentDate";
 import { getCurrentMonth } from "@/utils/formatDate";
 import { updateTotalPrice } from "@/utils/price";
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { ExpsState, Item } from "@/types";
 
-// export type Item = {
-//   id: number;
-//   name: string;
-//   price: number;
-//   category: number;
-//   date: string;
-// };
-
-// type ExpsState = {
-//   items: Item[];
-//   totalMonthPrice: { date: string; total: number }[];
-//   totalDayPrice: { date: string; total: number }[];
-// };
-
-// const initialState: ExpsState = {
-//   items: [
-//     { id: 1, name: "商品1", price: 1000, category: 1, date: "2025-02-01" },
-//     { id: 2, name: "商品2", price: 2000, category: 1, date: "2025-02-01" },
-//     { id: 3, name: "商品2", price: 2000, category: 1, date: "2025-02-01" },
-//   ],
-//   totalMonthPrice: 0,
-//   totalDayPrice: 0,
-// };
 const initialState: ExpsState = {
-  items: [
-    { id: 1, name: "商品1", price: 1000, category: 1, date: "2025-02-01" },
-    { id: 2, name: "商品2", price: 2000, category: 1, date: "2025-02-01" },
-    { id: 3, name: "商品3", price: 2000, category: 1, date: "2025-02-02" },
-  ],
-  totalMonthPrice: [{ date: "2024-01", total: 3000 }],
+  items: [],
+  totalMonthPrice: [],
   totalDayPrice: [],
 };
+export const fetchExp = createAsyncThunk("data/fetchData", async () => {
+  try {
+    const { data: expsData, error: expsError } = await supabase
+      .from("exps")
+      .select("*");
+
+    if (expsError) {
+      console.error("Supabase Error:", expsError);
+      throw new Error(expsError.message);
+    }
+
+    console.log("Fetched Data:", expsData);
+    return { expsData };
+  } catch (error) {
+    console.error("Unexpected Error:", error);
+    throw new Error(error instanceof Error ? error.message : "Unknown error");
+  }
+});
+export const addExpToDB = createAsyncThunk(
+  "data/addExp",
+  async (newExp: Omit<ExpsState, "id">, { rejectWithValue }) => {
+    try {
+      const { data, error } = await supabase
+        .from("exps")
+        .insert([newExp])
+        .select("*")
+        .single();
+
+      if (error) {
+        console.error("Supabase Error:", error);
+        return rejectWithValue(error.message || "Supabase error occurred");
+      }
+
+      console.log("Added Exps:", data);
+      return data;
+    } catch (error) {
+      console.error("Unexpected Error:", error);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Unknown error"
+      );
+    }
+  }
+);
 
 const expSlice = createSlice({
   name: "totalExp",
   initialState,
   reducers: {
     totalMonthExp: (state) => {
-      const date = getCurrentMonth();
-      // const totalPrice = state.items.reduce((sum, item) => {
-      //   if (item.date.startsWith(date)) {
-      //     return sum + item.price;
-      //   }
-      //   return sum;
-      // }, 0);
-      state.totalMonthPrice = updateTotalPrice(
-        state.items,
-        date,
-        state.totalMonthPrice
-      );
-
-      // state.totalMonthPrice = [
-      //   ...state.totalMonthPrice.filter((item) => item.date !== date), // 現在の月の項目を除外
-      //   { date, total: totalPrice }, // 新しいエントリを追加（または更新）
-      // ];
-    },
-    totalDayExp: (state) => {
-      const date = new Date().toISOString().split("T")[0];
-      state.totalDayPrice = updateTotalPrice(
-        state.items,
-        date,
-        state.totalDayPrice
-      );
-    },
-
-    addExp: (state, action: PayloadAction<Item>) => {
-      state.items.push(action.payload);
       state.totalMonthPrice = updateTotalPrice(
         state.items,
         getCurrentMonth(),
-        state.totalMonthPrice
-      );
-      state.totalDayPrice = updateTotalPrice(
-        state.items,
-        new Date().toISOString().split("T")[0],
-        state.totalDayPrice
+        "month"
       );
     },
+    totalDayExp: (state) => {
+      state.totalDayPrice = updateTotalPrice(
+        state.items,
+        getCurrentDate(),
+        "day"
+      );
+    },
+    addExp: (state, action: PayloadAction<Item>) => {
+      state.items.push(action.payload);
+      // 月ごとの合計を更新
+      expSlice.caseReducers.totalMonthExp(state);
+      // 日ごとの合計を更新
+      expSlice.caseReducers.totalDayExp(state);
+    },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(fetchExp.fulfilled, (state, action) => {
+      state.items = action.payload.expsData || [];
+      // 月ごとの合計を更新
+      expSlice.caseReducers.totalMonthExp(state);
+      // 日ごとの合計を更新
+      expSlice.caseReducers.totalDayExp(state);
+    });
   },
 });
 
 export const { totalMonthExp, totalDayExp, addExp } = expSlice.actions;
-
 export const expReducer = expSlice.reducer;

@@ -1,63 +1,88 @@
-"use client";
-
-import { Box, HStack, createListCollection } from "@chakra-ui/react";
-import {
-  SelectContent,
-  SelectItem,
-  SelectRoot,
-  SelectTrigger,
-  SelectValueText,
-} from "@/components/ui/select";
+import * as React from "react";
+import ListItemDecorator from "@mui/joy/ListItemDecorator";
+import ListDivider from "@mui/joy/ListDivider";
+import { Select as MUISelect, SelectOption } from "@mui/joy";
+import Option from "@mui/joy/Option";
 import { FC } from "react";
+import { Box } from "@mui/material";
+import { Category } from "@/types";
 
 type SelectProps = {
-  onChange?: () => void;
+  options: Category[];
 };
 
-const SelectValueItem = () => (
-  <SelectValueText placeholder="Select movie">
-    {(items: Array<{ label: string; color: string }>) => {
-      const { label, color } = items[0];
-      return (
-        <HStack>
-          <Box w="16px" h="16px" bg={color} borderRadius="999px" />
-          {label}
-        </HStack>
-      );
-    }}
-  </SelectValueText>
-);
+function renderValue(o: (SelectOption<string> & Category) | null) {
+  if (!o) return null;
 
-export const Select: FC<SelectProps> = ({ onChange, ...props }) => {
   return (
-    <SelectRoot
-      collection={frameworks}
-      defaultValue={["React.js"]}
-      positioning={{ sameWidth: true }}
-      {...props}
+    <Box sx={{ display: "flex", alignItems: "center" }}>
+      <Box
+        sx={{
+          width: 16,
+          height: 16,
+          backgroundColor: o.color,
+          borderRadius: "50%",
+          marginRight: 1,
+          outlineOffset: "-1px",
+          outline: o.color === "#ffffff" ? "1px solid #999" : undefined,
+        }}
+      />
+      {o.name}
+    </Box>
+  );
+}
+
+export const Select: FC<SelectProps> = ({ options }) => {
+  return (
+    <MUISelect
+      placeholder={options[0]?.name}
+      size="sm"
+      variant="soft"
+      slotProps={{
+        listbox: {
+          sx: {
+            backgroundColor: "#fff",
+            maxHeight: "160px",
+          },
+        },
+      }}
+      sx={{ padding: "0 12px" }}
+      renderValue={(selected) => {
+        const selectedCategory = options.find(
+          (o) => o.id.toString() === selected?.value
+        );
+        return renderValue(selectedCategory ?? null);
+      }}
     >
-      <SelectTrigger>
-        <SelectValueItem />
-      </SelectTrigger>
-      <SelectContent portalled={false}>
-        {frameworks.items.map((item, i) => (
-          <SelectItem item={item} key={i} justifyContent="flex-start">
-            <Box w="16px" h="16px" bg={item.color} borderRadius="999px" />
-            {item.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </SelectRoot>
+      {options.map((o, index) => (
+        <Box key={o.id}>
+          {index !== 0 && <ListDivider inset="startContent" />}
+          <Option
+            value={o.id.toString()}
+            label={o.name}
+            sx={{
+              backgroundColor: "#fff",
+              alignItems: "center",
+              lineHeight: "16px",
+            }}
+          >
+            {/* <ListItemDecorator> */}
+            <Box
+              sx={{
+                width: 16,
+                height: 16,
+                backgroundColor: o.color,
+                borderRadius: "50%",
+                outlineOffset: "-1px",
+                outline:
+                  o.color === "#ffffff" ? "1px solid #d7d7d7" : undefined,
+              }}
+            />
+            {/* </ListItemDecorator> */}
+            {o.name}
+          </Option>
+        </Box>
+      ))}
+    </MUISelect>
   );
 };
-
-const frameworks = createListCollection({
-  items: [
-    { label: "React.js", value: "react", color: "#555" },
-    { label: "Vue.js", value: "vue", color: "#d88989" },
-    { label: "Angular", value: "angular", color: "#89d8c9" },
-    { label: "Svelte", value: "svelte", color: "#5dc98c" },
-  ],
-  itemToString: (item) => item.label,
-  itemToValue: (item) => item.label,
-});
