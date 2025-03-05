@@ -1,45 +1,53 @@
-// "use client";
-
-// import { Box } from "@chakra-ui/react";
-// import FullCalendar from "@fullcalendar/react";
-// import dayGridPlugin from "@fullcalendar/daygrid";
-// import style from "./Middle.module.scss";
-
-// export const Middle = () => {
-//   return (
-//     <Box className={style.middleStyle}>
-//       <FullCalendar
-//         plugins={[dayGridPlugin]} // pluginsにdayGridPluginを設定する
-//         headerToolbar={{
-//           right: "dayGridMonth,dayGridWeek",
-//         }}
-//         initialView="dayGridMonth" // 初期表示のモードを設定する
-//         events={"https://fullcalendar.io/api/demo-feeds/events.json"}
-//       />
-//     </Box>
-//   );
-// };
-
 "use client";
 
-import { Box } from "@chakra-ui/react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import style from "./Middle.module.scss";
+import { Box, Skeleton } from "@mui/material";
+import { RootState } from "@/redux/store";
+import { useDispatch, useSelector } from "react-redux";
+import { FC, useEffect } from "react";
+import { PageType } from "@/types";
 
-export const Middle = () => {
+export const Middle: FC<PageType> = ({ loading }) => {
+  const dispatch = useDispatch();
+
+  // useEffect(() => {
+  //   const fetchData = async () => {
+  //     await dispatch(fetchExp());
+  //     setLoading(false);
+  //   };
+
+  //   fetchData();
+  // }, []);
+
+  const totalDayPrice = useSelector(
+    (state: RootState) => state.exp.totalDayPrice
+  );
+  console.log(totalDayPrice);
+
+  const events = totalDayPrice.map((item) => ({
+    title: `¥${item.total}`, // titleをtotalに設定
+    start: item.date, // startをdateに設定
+  }));
+
   return (
     <Box className={style.middleStyle}>
-      <Box maxH="500px" h="100%">
-        <FullCalendar
-          plugins={[dayGridPlugin]}
-          initialView="dayGridMonth"
-          locale="ja"
-          dayCellContent={(e) => {
-            return e.dayNumberText.replace("日", ""); // "日" を削除して日付のみ表示
-          }}
-          height="100%"
-        />
+      <Box maxHeight="500px" height="100%">
+        {loading ? (
+          <Skeleton />
+        ) : (
+          <FullCalendar
+            plugins={[dayGridPlugin]}
+            initialView="dayGridMonth"
+            locale="ja"
+            dayCellContent={(e) => {
+              return e.dayNumberText.replace("日", "");
+            }}
+            height="100%"
+            events={events}
+          />
+        )}
       </Box>
     </Box>
   );

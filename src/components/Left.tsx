@@ -1,146 +1,133 @@
 "use client";
 
-import { Box, Button, Container, Flex, Input, Text } from "@chakra-ui/react";
-import style from "./Left.module.scss";
-import { SumBox } from "./SumBox";
-import { Select } from "./Select";
-import { SubmitHandler, useForm } from "react-hook-form";
+import { addExpToDB } from "@/redux/slices/exp";
+import { RootState } from "@/redux/store";
+import {
+  Box,
+  Button,
+  Container,
+  Skeleton,
+  Stack,
+  Typography,
+} from "@mui/material";
+import { FC } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { useDispatch, useSelector } from "react-redux";
-import { useEffect, useState } from "react";
-import axios from "axios";
-import { addExp } from "@/redux/slices/exp";
-import { useCurrentDate } from "@/hooks/useCurrentDate";
+import { Select } from "./Select";
+import { SumBox } from "./SumBox";
+import { getCurrentMonth } from "@/hooks/useCurrentDate";
+import { PageType } from "@/types";
+import { Input } from "./Input";
+import style from "./Left.module.scss";
 
 type Inputs = {
   price: number;
   category: string;
   name?: string;
 };
-
-export const Left = () => {
-  const [loading, setLoading] = useState(true);
+export const Left: FC<PageType> = ({ loading }) => {
   const dispatch = useDispatch();
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors },
-  } = useForm<Inputs>();
+  } = useForm<Inputs>({
+    defaultValues: {
+      price: 0, // 初期値を設定
+    },
+  });
+  console.log("フォームエラー:", errors);
 
-  const onSubmit: SubmitHandler<Inputs> = async (data) => {
-    const currentDate = useCurrentDate();
+  const totalMonthPrice = useSelector(
+    (state: RootState) => state.exp.totalMonthPrice
+  );
+  const totalDayPrice = useSelector(
+    (state: RootState) => state.exp.totalDayPrice
+  );
+  const categories = useSelector(
+    (state: RootState) => state.category.categories
+  );
+
+  const onSubmit = (data: Inputs) => {
+    console.log("onSubmit が呼ばれました"); // このログを確認
+    console.log("送信データ:", data);
 
     const newItem = {
-      id: 1,
-      name: data.name ?? "",
+      name: data.name,
       price: Number(data.price),
-      category: 1,
-      date: currentDate,
+      category: data.category,
+      date: new Date().toISOString().slice(0, 10),
     };
-    // try {
-    //   const response = await axios.post(
-    //     "http://localhost:3000/api/exp",
-    //     newItem
-    //   );
 
-    //   if (response.status === 200) {
-    //     dispatch(addExp(newItem));
-    //     console.log(newItem);
-    //   } else {
-    //     console.error("API error:", response.data);
-    //   }
-    // } catch (error) {
-    //   console.error("Error sending data:", error);
-    // } finally {
-    //   setLoading(false); // ローディング状態を終了
-    // }
+    dispatch(addExpToDB(newItem));
   };
 
-  const totalPrice = useSelector(
-    (state: any) =>
-      state.exp.totalMonthPrice.filter((item) => item.date === "2024-01")[0]
-        ?.total
-  );
-  console.log(totalPrice);
-
-  // useEffect(() => {
-  // const now = new Date(Date.now());
-  // const year = now.getFullYear();
-  // const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  // const day = now.getDate().toString().padStart(2, "0");
-  // const formattedDate = `${year}-${month}-${day}`;
-  // setDate(formattedDate);
-  // dispatch(totalExp());
-  // }, []);
-
-  // if (loading) {
-  //   return <div>Loading...</div>;
-  // }
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get("http://localhost:3000/api/exp");
-        console.log(response);
-        // 必要なデータを取得した場合の処理
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false); // データの取得が完了したらローディング終了
-      }
-    };
-
-    fetchData();
-  }, []);
-  if (loading) {
-    return <div>loading...</div>; // ローディング中は loading... を表示
-  }
-
   return (
-    <>
-      <Box className={style.leftStyle}>
-        <Box background="#74839F" h="200px" p="50px 0">
-          <Container>
-            <Text as="h1" fontSize="30px" fontWeight="bold" color="#fff">
-              家計簿
-            </Text>
-            {/* <div>
-              {totalPrice.map((item) => (
-                <div key={item.date}>
-                  <p>Date: {item.date}</p>
-                  <p>Total: {item.total}</p>
-                </div>
-              ))}
-            </div> */}
-          </Container>
-        </Box>
-        <Container>
-          <Flex mt="-50px" justify="space-between">
-            <SumBox bg="skyblue">
-              収入
-              <br />
-              ¥10,000
-            </SumBox>
-            <SumBox bg="pink">
-              支出
-              <br />¥{/* {totalPrice} */}
-            </SumBox>
-          </Flex>
-          <Box p="30px 0">
-            <Text>アイテムを追加</Text>
-            <form onSubmit={handleSubmit(onSubmit)}>
-              <Input
-                placeholder="1000"
-                {...register("price", { required: true })}
-              />
-              <Select />
-              <Input placeholder="洗剤" {...register("name")} />
-              {/* <Text textAlign="right"></Text> */}
-              <Button type="submit">追加</Button>
-              <Button>キャンセル</Button>
-            </form>
-          </Box>
+    <Box className={style.leftStyle}>
+      <Box bgcolor="#74839F" height="120px" p="70px 0 30px">
+        <Container maxWidth="sm">
+          <Typography fontSize="30px" fontWeight="bold" color="#fff">
+            家計簿
+          </Typography>
         </Container>
       </Box>
-    </>
+      <Container>
+        <Box
+          display="flex"
+          marginTop="-50px"
+          justifyContent="space-between"
+          columnGap="20px"
+        >
+          <SumBox color="skyblue">
+            <div>
+              <span>収入</span>
+              <Typography>¥10,000</Typography>
+            </div>
+          </SumBox>
+          <SumBox color="pink">
+            <div>
+              <span>支出</span>
+              {loading ? (
+                <Skeleton />
+              ) : (
+                <Typography>
+                  ¥
+                  {totalMonthPrice
+                    .filter((t) => t.date.startsWith(getCurrentMonth()))
+                    .map((item) => item.total)}
+                </Typography>
+              )}
+            </div>
+          </SumBox>
+        </Box>
+      </Container>
+      {/* <Container> */}
+      <form onSubmit={handleSubmit(onSubmit)}>
+        <Box width="66%" m="60px auto">
+          <Stack gap={2}>
+            <Typography fontWeight="bold">アイテムを追加</Typography>
+
+            <Controller
+              name="price"
+              control={control}
+              rules={{ required: "価格は必須です" }}
+              render={({ field }) => <Input {...field} placeholder="1000" />}
+            />
+            {errors.price && errors.price.message}
+            <Input placeholder="洗剤" {...register("name")} />
+            <Select options={categories} {...register("category")} />
+
+            <Stack direction="row" spacing={2} m="10px auto">
+              <Button type="submit" variant="contained" disableElevation>
+                追加
+              </Button>
+              <Button type="reset">キャンセル</Button>
+            </Stack>
+          </Stack>
+        </Box>
+      </form>
+      {/* </Container> */}
+    </Box>
   );
 };
