@@ -1,3 +1,4 @@
+
 export type Item = {
   id: string;
   name?: string;
@@ -6,10 +7,15 @@ export type Item = {
   date: string;
 };
 
+type TotalPriceItem = {
+  date: string;
+  total: number;
+};
+
 export type ExpsState = {
   items: Item[];
-  totalMonthPrice: { date: string; total: number }[];
-  totalDayPrice: { date: string; total: number }[];
+  totalMonthPrice: TotalPriceItem[];
+  totalDayPrice: TotalPriceItem[];
 };
 
 export type Category = {
@@ -23,4 +29,6 @@ export type CategoriesState = {
 
 export type PageType = {
   loading: boolean;
+  selectedDate: string;
+  setSelectedDate: React.Dispatch<React.SetStateAction<string>>;
 };
