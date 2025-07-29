@@ -1,49 +1,66 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { supabase } from "@/lib/supabase";
-import { getCurrentDate } from "@/hooks/useCurrentDate";
 import { getCurrentMonth } from "@/utils/formatDate";
 import { updateTotalPrice } from "@/utils/price";
 import { ExpsState, Item } from "@/types";
+import { getCurrentDateLocal } from "@/hooks/useCurrentDate";
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8080";
 
 const initialState: ExpsState = {
   items: [],
   totalMonthPrice: [],
   totalDayPrice: [],
 };
-export const fetchExp = createAsyncThunk("data/fetchData", async () => {
-  try {
-    const { data: expsData, error: expsError } = await supabase
-      .from("exps")
-      .select("*");
 
-    if (expsError) {
-      console.error("Supabase Error:", expsError);
-      throw new Error(expsError.message);
-    }
+export const fetchExp = createAsyncThunk(
+  "data/fetchData",
+  async ({
+    year,
+    month,
+    day,
+  }: {
+    year?: number;
+    month?: number;
+    day?: number;
+  }) => {
+    const params = new URLSearchParams();
 
-    console.log("Fetched Data:", expsData);
+    if (year !== undefined) params.append("year", String(year));
+    if (month !== undefined) params.append("month", String(month));
+    if (day !== undefined) params.append("day", String(day));
+
+    const response = await fetch(`${API_BASE_URL}/api/items?${params.toString()}`);
+    if (!response.ok) throw new Error("API接続失敗");
+    const expsData = await response.json();
     return { expsData };
-  } catch (error) {
-    console.error("Unexpected Error:", error);
-    throw new Error(error instanceof Error ? error.message : "Unknown error");
   }
-});
+);
+
+
 export const addExpToDB = createAsyncThunk(
   "data/addExp",
   async (newExp: Omit<ExpsState, "id">, { rejectWithValue }) => {
-    try {
-      const { data, error } = await supabase
-        .from("exps")
-        .insert([newExp])
-        .select("*")
-        .single();
 
-      if (error) {
-        console.error("Supabase Error:", error);
-        return rejectWithValue(error.message || "Supabase error occurred");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/items`, {
+        // const response = await fetch("http://localhost:8080/api/items", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newExp),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Error:", errorText);
+        return rejectWithValue(errorText);
       }
 
-      console.log("Added Exps:", data);
+      const data = await response.json();
+      console.log("Added Exp:", data);
+      const now = new Date();
+
       return data;
     } catch (error) {
       console.error("Unexpected Error:", error);
@@ -53,41 +70,72 @@ export const addExpToDB = createAsyncThunk(
     }
   }
 );
+export const deleteExpFromDB = createAsyncThunk(
+  "data/deleteExp",
+  async (id: string, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/items/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Error:", errorText);
+        return rejectWithValue(errorText);
+      }
+
+      return id; 
+    } catch (error) {
+      console.error("Unexpected Error:", error);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Unknown error"
+      );
+    }
+  }
+);
+
+
+const recalculateTotals = (state: ExpsState) => {
+  state.totalMonthPrice = updateTotalPrice(state.items, getCurrentMonth(), "month");
+  state.totalDayPrice = updateTotalPrice(state.items, getCurrentDateLocal(), "day");
+};
+
+// addExp内での使用
+// recalculateTotals(state);
+
+// removeExp内での使用
+// recalculateTotals(state);
+
 
 const expSlice = createSlice({
   name: "totalExp",
   initialState,
   reducers: {
     totalMonthExp: (state) => {
-      state.totalMonthPrice = updateTotalPrice(
-        state.items,
-        getCurrentMonth(),
-        "month"
-      );
+      state.totalMonthPrice = updateTotalPrice(state.items, getCurrentMonth(), "month");
     },
     totalDayExp: (state) => {
-      state.totalDayPrice = updateTotalPrice(
-        state.items,
-        getCurrentDate(),
-        "day"
-      );
+      state.totalDayPrice = updateTotalPrice(state.items, getCurrentDateLocal(), "day");
     },
     addExp: (state, action: PayloadAction<Item>) => {
+      if (action.payload.price <= 0) return;
       state.items.push(action.payload);
-      // 月ごとの合計を更新
-      expSlice.caseReducers.totalMonthExp(state);
-      // 日ごとの合計を更新
-      expSlice.caseReducers.totalDayExp(state);
+      recalculateTotals(state);
     },
   },
   extraReducers: (builder) => {
-    builder.addCase(fetchExp.fulfilled, (state, action) => {
-      state.items = action.payload.expsData || [];
-      // 月ごとの合計を更新
-      expSlice.caseReducers.totalMonthExp(state);
-      // 日ごとの合計を更新
-      expSlice.caseReducers.totalDayExp(state);
-    });
+    builder
+      .addCase(fetchExp.fulfilled, (state, action) => {
+        state.items = action.payload.expsData || [];
+        recalculateTotals(state);
+      })
+      .addCase(deleteExpFromDB.fulfilled, (state, action) => {
+        state.items = state.items.filter(item => item.id !== action.payload);
+        recalculateTotals(state);
+      })
+      .addCase(deleteExpFromDB.rejected, (state, action) => {
+        console.error("削除失敗:", action.payload);
+      });
   },
 });
 

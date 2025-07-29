@@ -1,19 +1,38 @@
+// utils/date.ts
+
+// 指定した日付文字列を日本時間でフォーマットして返す
 export const formatDate = (date: string) => {
-  const parsedDate = new Date(date);
+  const utc = new Date(date);
+  const offset = utc.getTimezoneOffset() * 60000;
+  const local = new Date(utc.getTime() - offset);
+
   return {
-    year: parsedDate.getFullYear(),
-    month: parsedDate.getMonth() + 1, // 月は0から始まるので1を足す
-    day: parsedDate.getDate(),
-    time: parsedDate.toTimeString().split(" ")[0], // 時間を取り出す
+    year: local.getFullYear(),
+    month: local.getMonth() + 1,
+    day: local.getDate(),
+    time: local.toTimeString().split(" ")[0], // "hh:mm:ss"
   };
 };
-export const getCurrentDate = () => {
-  const currentDate = new Date();
-  return currentDate.toISOString();
+
+// 現在のUTC時刻（ISO形式）を取得（例: "2025-06-18T10:00:00.000Z"）
+export const getCurrentDate = (): string => {
+  return new Date().toISOString();
 };
-export const getCurrentMonth = () => {
-  const currentDate = new Date();
-  const year = currentDate.getFullYear();
-  const month = (currentDate.getMonth() + 1).toString().padStart(2, "0"); // 月は0始まりなので1を足す
-  return `${year}-${month}`;
+
+// 現在の日本時間の日付（YYYY-MM-DD）を取得
+export const getCurrentDateLocal = (): string => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  const local = new Date(now.getTime() - offset);
+  return local.toISOString().slice(0, 10); // 例: "2025-06-18"
+};
+
+// 現在の日本時間の年月（YYYY-MM）を取得
+export const getCurrentMonth = (): string => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  const local = new Date(now.getTime() - offset);
+  const year = local.getFullYear();
+  const month = String(local.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`; // 例: "2025-06"
 };

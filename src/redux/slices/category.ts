@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { supabase } from "@/lib/supabase";
 import { Category, Item } from "@/types";
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:8080";
 
 const initialState: { categories: Category[] } = {
   categories: [],
@@ -9,15 +10,9 @@ export const fetchCategory = createAsyncThunk(
   "data/fetchCategory",
   async () => {
     try {
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("categories")
-        .select("*");
-
-      if (categoriesError) {
-        console.error("Supabase Error:", categoriesError);
-        throw new Error(categoriesError.message);
-      }
-
+      const response = await fetch(`${API_BASE_URL}/api/categories`);
+      if (!response.ok) throw new Error("Failed to fetch categories");
+      const categoriesData = await response.json();
       console.log("Fetched Categories:", categoriesData);
       return { categoriesData };
     } catch (error) {
@@ -31,19 +26,47 @@ export const addCategoryToDB = createAsyncThunk(
   "data/addCategory",
   async (newCategory: Omit<Item, "id">, { rejectWithValue }) => {
     try {
-      const { data, error } = await supabase
-        .from("categories")
-        .insert([newCategory])
-        .select("*")
-        .single();
+      const response = await fetch(`${API_BASE_URL}/api/categories`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newCategory),
+      });
 
-      if (error) {
-        console.error("Supabase Error:", error);
-        return rejectWithValue(error.message);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Error:", errorText);
+        return rejectWithValue(errorText);
       }
 
+      const data = await response.json();
       console.log("Added Category:", data);
       return data;
+    } catch (error) {
+      console.error("Unexpected Error:", error);
+      return rejectWithValue(
+        error instanceof Error ? error.message : "Unknown error"
+      );
+    }
+  }
+);
+
+export const deleteCategoryFromDB = createAsyncThunk(
+  "data/deleteCategory",
+  async (id: string, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/categories/${id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API Error:", errorText);
+        return rejectWithValue(errorText);
+      }
+
+      return id; 
     } catch (error) {
       console.error("Unexpected Error:", error);
       return rejectWithValue(
@@ -58,7 +81,7 @@ const categorySlice = createSlice({
   initialState,
   reducers: {
     addCategory: (state, action: PayloadAction<Category>) => {
-      state.categories.push(action.payload); // カテゴリーを追加
+      state.categories.push(action.payload);
     },
   },
   extraReducers: (builder) => {
